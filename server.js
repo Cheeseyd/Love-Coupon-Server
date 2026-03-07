@@ -2,13 +2,31 @@ const express = require("express");
 const { PKPass } = require("passkit-generator");
 const fs = require("fs");
 const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const PORT = 3000;
 
+/*
+Simple coupon storage
+(In production this would be a database)
+*/
+let coupons = {};
+
+
+/*
+Generate coupon pass
+*/
 app.get("/coupon", async (req, res) => {
 
     const couponText = req.query.text || "Free Hug";
+
+    const id = uuidv4();
+
+    coupons[id] = {
+        text: couponText,
+        used: false
+    };
 
     try {
 
@@ -22,10 +40,24 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
+        pass.serialNumber = id;
+
         pass.primaryFields.push({
             key: "offer",
             label: "Love Coupon",
             value: couponText
+        });
+
+        pass.secondaryFields.push({
+            key: "id",
+            label: "Coupon ID",
+            value: id.slice(0, 8)
+        });
+
+        pass.setBarcodes({
+            format: "PKBarcodeFormatQR",
+            message: `https://love-coupon-server.onrender.com/redeem/${id}`,
+            messageEncoding: "iso-8859-1"
         });
 
         res.set({
@@ -36,12 +68,40 @@ app.get("/coupon", async (req, res) => {
         res.send(pass.getAsBuffer());
 
     } catch (err) {
-    console.log("PASS ERROR:");
-    console.log(err);
-    res.status(500).send(err.toString());
-}
+
+        console.log("PASS ERROR:");
+        console.log(err);
+        res.status(500).send(err.toString());
+
+    }
 
 });
+
+
+/*
+Redeem coupon endpoint
+*/
+app.get("/redeem/:id", (req, res) => {
+
+    const id = req.params.id;
+
+    if (!coupons[id]) {
+        return res.send("Invalid coupon");
+    }
+
+    if (coupons[id].used) {
+        return res.send("Coupon already redeemed ❤️");
+    }
+
+    coupons[id].used = true;
+
+    res.send(`
+        <h1>Coupon Redeemed ❤️</h1>
+        <p>${coupons[id].text}</p>
+    `);
+
+});
+
 
 app.listen(PORT, () => {
     console.log("Coupon server running on port " + PORT);
