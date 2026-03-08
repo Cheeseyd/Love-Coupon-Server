@@ -95,10 +95,7 @@ app.get("/redeem/:id", (req, res) => {
 
     coupons[id].used = true;
 
-    res.send(`
-        <h1>Coupon Redeemed ❤️</h1>
-        <p>${coupons[id].text}</p>
-    `);
+    res.send(`Coupon Redeemed ❤️: ${coupons[id].text}`);
 
 });
 
