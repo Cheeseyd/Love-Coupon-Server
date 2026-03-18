@@ -46,10 +46,7 @@ app.get("/coupon", async (req, res) => {
         pass.setSerialNumber(id);
         pass.setAuthenticationToken(id);
 
-        pass.setProps({
-        serialNumber: id,
-        authenticationToken: id
-        });
+        
 
         // ensure arrays exist
         pass.primaryFields = pass.primaryFields || [];
