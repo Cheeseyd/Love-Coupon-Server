@@ -43,8 +43,8 @@ app.get("/coupon", async (req, res) => {
         });
 
         // ✅ correct way
-        pass.serialNumber = id;
-        pass.authenticationToken = authToken;
+        pass.passJSON.serialNumber = id;
+        pass.passJSON.authenticationToken = id;
 
         // ensure arrays exist
         pass.primaryFields = pass.primaryFields || [];
