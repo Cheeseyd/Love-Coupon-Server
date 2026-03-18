@@ -44,6 +44,9 @@ app.get("/coupon", async (req, res) => {
         // unique ID (IMPORTANT for multiple passes)
         pass.serialNumber = id;
 
+        // 🔥 CRITICAL FIX (prevents Wallet replacing passes)
+        pass.authenticationToken = uuidv4();
+
         // ensure arrays exist (prevents crashes)
         pass.primaryFields = pass.primaryFields || [];
         pass.secondaryFields = pass.secondaryFields || [];
