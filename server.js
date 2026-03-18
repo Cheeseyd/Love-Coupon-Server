@@ -22,6 +22,7 @@ app.get("/coupon", async (req, res) => {
     const from = req.query.from || "Someone ❤️";
 
     const id = uuidv4();
+    const authToken = uuidv4();
 
     coupons[id] = {
         text: couponText,
@@ -41,39 +42,37 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // unique ID (IMPORTANT for multiple passes)
+        // 🔥 FORCE UNIQUE PASS (this is the real fix)
         pass.serialNumber = id;
+        pass.authenticationToken = authToken;
 
-        // 🔥 CRITICAL FIX (prevents Wallet replacing passes)
-        pass.authenticationToken = uuidv4();
+        // ALSO override inside raw data (important)
+        pass.passJSON.serialNumber = id;
+        pass.passJSON.authenticationToken = authToken;
 
-        // ensure arrays exist (prevents crashes)
+        // make sure arrays exist
         pass.primaryFields = pass.primaryFields || [];
         pass.secondaryFields = pass.secondaryFields || [];
         pass.auxiliaryFields = pass.auxiliaryFields || [];
 
-        // main coupon text
         pass.primaryFields.push({
             key: "offer",
             label: "Love Coupon",
             value: couponText
         });
 
-        // from field
         pass.secondaryFields.push({
             key: "from",
             label: "From",
             value: from
         });
 
-        // short ID (for debugging / nice UI)
         pass.auxiliaryFields.push({
             key: "id",
             label: "Code",
             value: id.slice(0, 8)
         });
 
-        // QR code for redeem
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -88,15 +87,12 @@ app.get("/coupon", async (req, res) => {
         res.send(pass.getAsBuffer());
 
     } catch (err) {
-
         console.log("PASS ERROR:");
         console.log(err);
         res.status(500).send(err.toString());
-
     }
 
 });
-
 
 /*
 Redeem coupon
