@@ -42,15 +42,11 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // 🔥 FORCE UNIQUE PASS (this is the real fix)
+        // ✅ correct way
         pass.serialNumber = id;
         pass.authenticationToken = authToken;
 
-        // ALSO override inside raw data (important)
-        pass.passJSON.serialNumber = id;
-        pass.passJSON.authenticationToken = authToken;
-
-        // make sure arrays exist
+        // ensure arrays exist
         pass.primaryFields = pass.primaryFields || [];
         pass.secondaryFields = pass.secondaryFields || [];
         pass.auxiliaryFields = pass.auxiliaryFields || [];
