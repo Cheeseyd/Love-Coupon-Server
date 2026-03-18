@@ -9,7 +9,6 @@ const PORT = 3000;
 
 /*
 Simple coupon storage
-(In production this would be a database)
 */
 let coupons = {};
 
@@ -20,11 +19,13 @@ Generate coupon pass
 app.get("/coupon", async (req, res) => {
 
     const couponText = req.query.text || "Free Hug";
+    const from = req.query.from || "Someone ❤️";
 
     const id = uuidv4();
 
     coupons[id] = {
         text: couponText,
+        from: from,
         used: false
     };
 
@@ -40,20 +41,36 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
+        // unique ID (IMPORTANT for multiple passes)
         pass.serialNumber = id;
 
+        // ensure arrays exist (prevents crashes)
+        pass.primaryFields = pass.primaryFields || [];
+        pass.secondaryFields = pass.secondaryFields || [];
+        pass.auxiliaryFields = pass.auxiliaryFields || [];
+
+        // main coupon text
         pass.primaryFields.push({
             key: "offer",
             label: "Love Coupon",
             value: couponText
         });
 
+        // from field
         pass.secondaryFields.push({
+            key: "from",
+            label: "From",
+            value: from
+        });
+
+        // short ID (for debugging / nice UI)
+        pass.auxiliaryFields.push({
             key: "id",
-            label: "Coupon ID",
+            label: "Code",
             value: id.slice(0, 8)
         });
 
+        // QR code for redeem
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -79,7 +96,7 @@ app.get("/coupon", async (req, res) => {
 
 
 /*
-Redeem coupon endpoint
+Redeem coupon
 */
 app.get("/redeem/:id", (req, res) => {
 
