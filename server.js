@@ -39,16 +39,12 @@ app.get("/coupon", async (req, res) => {
         signerCert: fs.readFileSync("certs/passCert.pem"),
         signerKey: fs.readFileSync("certs/passKey.pem"),
         signerKeyPassphrase: "password"
-    },
-    overrides: {
-        serialNumber: id,
-        authenticationToken: id
     }
 });
 
-        // 🔥 REAL FIX
-        pass.serialNumber = id;
-        pass.authenticationToken = id;
+        // 🔥 THIS IS THE FIX
+        pass.setSerialNumber(id);
+        pass.setAuthenticationToken(id);
 
         pass.setProps({
         serialNumber: id,
