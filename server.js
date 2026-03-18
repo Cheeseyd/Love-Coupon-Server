@@ -42,9 +42,14 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ✅ correct way
-        pass.passJSON.serialNumber = id;
-        pass.passJSON.authenticationToken = id;
+        // 🔥 REAL FIX
+        pass.serialNumber = id;
+        pass.authenticationToken = id;
+
+        pass.setProps({
+        serialNumber: id,
+        authenticationToken: id
+        });
 
         // ensure arrays exist
         pass.primaryFields = pass.primaryFields || [];
