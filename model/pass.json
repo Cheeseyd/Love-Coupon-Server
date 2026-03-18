@@ -1,14 +1,20 @@
 {
   "formatVersion": 1,
   "passTypeIdentifier": "pass.com.dillybarproductions.coupons",
-  "serialNumber": "123456",
+  "serialNumber": "TEMP",
   "teamIdentifier": "62V445535C",
   "organizationName": "Love Coupons",
   "description": "Love Coupon",
   "logoText": "Love Coupon",
+
   "foregroundColor": "rgb(255,255,255)",
   "backgroundColor": "rgb(255,105,180)",
+
   "generic": {
-    "primaryFields": []
+    "headerFields": [],
+    "primaryFields": [],
+    "secondaryFields": [],
+    "auxiliaryFields": [],
+    "backFields": []
   }
 }
