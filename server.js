@@ -22,7 +22,6 @@ app.get("/coupon", async (req, res) => {
     const from = req.query.from || "Someone ❤️";
 
     const id = uuidv4();
-    const authToken = uuidv4();
 
     coupons[id] = {
         text: couponText,
@@ -32,45 +31,57 @@ app.get("/coupon", async (req, res) => {
 
     try {
 
+        const modelPath = path.join(__dirname, "model.pass");
+        const passJsonPath = path.join(modelPath, "pass.json");
+
+        // 🔥 READ ORIGINAL TEMPLATE
+        let passData = JSON.parse(fs.readFileSync(passJsonPath));
+
+        // 🔥 FORCE UNIQUE PASS
+        passData.serialNumber = id;
+        passData.authenticationToken = id;
+
+        // 🔥 WRITE TEMP CHANGES
+        fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
+
+        // 🔥 CREATE PASS
         const pass = await PKPass.from({
-    model: path.join(__dirname, "model.pass"),
-    certificates: {
-        wwdr: fs.readFileSync("certs/wwdr.pem"),
-        signerCert: fs.readFileSync("certs/passCert.pem"),
-        signerKey: fs.readFileSync("certs/passKey.pem"),
-        signerKeyPassphrase: "password"
-    }
-});
-
-        // 🔥 THIS IS THE FIX
-        pass.setSerialNumber(id);
-        pass.setAuthenticationToken(id);
-
-        
+            model: modelPath,
+            certificates: {
+                wwdr: fs.readFileSync("certs/wwdr.pem"),
+                signerCert: fs.readFileSync("certs/passCert.pem"),
+                signerKey: fs.readFileSync("certs/passKey.pem"),
+                signerKeyPassphrase: "password"
+            }
+        });
 
         // ensure arrays exist
         pass.primaryFields = pass.primaryFields || [];
         pass.secondaryFields = pass.secondaryFields || [];
         pass.auxiliaryFields = pass.auxiliaryFields || [];
 
+        // main coupon
         pass.primaryFields.push({
             key: "offer",
             label: "Love Coupon",
             value: couponText
         });
 
+        // from
         pass.secondaryFields.push({
             key: "from",
             label: "From",
             value: from
         });
 
+        // short code
         pass.auxiliaryFields.push({
             key: "id",
             label: "Code",
             value: id.slice(0, 8)
         });
 
+        // QR code
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -91,6 +102,7 @@ app.get("/coupon", async (req, res) => {
     }
 
 });
+
 
 /*
 Redeem coupon
