@@ -33,14 +33,18 @@ app.get("/coupon", async (req, res) => {
     try {
 
         const pass = await PKPass.from({
-            model: path.join(__dirname, "model.pass"),
-            certificates: {
-                wwdr: fs.readFileSync("certs/wwdr.pem"),
-                signerCert: fs.readFileSync("certs/passCert.pem"),
-                signerKey: fs.readFileSync("certs/passKey.pem"),
-                signerKeyPassphrase: "password"
-            }
-        });
+    model: path.join(__dirname, "model.pass"),
+    certificates: {
+        wwdr: fs.readFileSync("certs/wwdr.pem"),
+        signerCert: fs.readFileSync("certs/passCert.pem"),
+        signerKey: fs.readFileSync("certs/passKey.pem"),
+        signerKeyPassphrase: "password"
+    },
+    overrides: {
+        serialNumber: id,
+        authenticationToken: id
+    }
+});
 
         // 🔥 REAL FIX
         pass.serialNumber = id;
