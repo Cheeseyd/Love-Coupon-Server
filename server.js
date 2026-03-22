@@ -10,7 +10,13 @@ const PORT = 3000;
 /*
 Simple coupon storage
 */
+const couponsPath = path.join(__dirname, "coupons.json");
+
 let coupons = {};
+
+if (fs.existsSync(couponsPath)) {
+    coupons = JSON.parse(fs.readFileSync(couponsPath));
+}
 
 
 /*
@@ -28,6 +34,7 @@ app.get("/coupon", async (req, res) => {
         from: from,
         used: false
     };
+    fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
     try {
 
@@ -115,6 +122,7 @@ app.get("/redeem/:id", (req, res) => {
     }
 
     coupons[id].used = true;
+    fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
     res.send(`Coupon Redeemed ❤️: ${coupons[id].text}`);
 
