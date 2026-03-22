@@ -74,12 +74,7 @@ app.get("/coupon", async (req, res) => {
             value: from
         });
 
-        // short code
-        pass.auxiliaryFields.push({
-            key: "id",
-            label: "Code",
-            value: id.slice(0, 8)
-        });
+    
 
         // QR code
         pass.setBarcodes({
