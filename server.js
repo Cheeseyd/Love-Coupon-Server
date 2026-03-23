@@ -82,18 +82,7 @@ pass.fields.secondaryFields.push({
         
 
         // main coupon
-        pass.primaryFields.push({
-            key: "offer",
-            label: "",
-            value: couponText
-        });
-
-        // from
-        pass.secondaryFields.push({
-            key: "from",
-            label: "From",
-            value: from
-        });
+        
 
     
 
