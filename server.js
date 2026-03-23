@@ -8,44 +8,36 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-TEMP: disable file storage (Render disk issues)
+NO STORAGE (just to get server working again)
 */
 let coupons = {};
+
+/*
+ROOT TEST (CRITICAL)
+*/
+app.get("/", (req, res) => {
+    res.send("SERVER WORKING");
+});
+
+/*
+TEST ROUTE
+*/
+app.get("/test", (req, res) => {
+    res.send("TEST OK");
+});
 
 /*
 Generate coupon pass
 */
 app.get("/coupon", async (req, res) => {
-
     try {
-
         const couponText = req.query.text || "Free Hug";
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        coupons[id] = {
-            text: couponText,
-            from: from,
-            used: false
-        };
+        coupons[id] = { text: couponText, from, used: false };
 
         const modelPath = path.join(__dirname, "model.pass");
-        const passJsonPath = path.join(modelPath, "pass.json");
-
-        let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
-
-        passData.serialNumber = id;
-        passData.authenticationToken = id;
-
-        passData.generic = passData.generic || {};
-        passData.generic.primaryFields = [
-            { key: "offer", label: "", value: couponText }
-        ];
-        passData.generic.secondaryFields = [
-            { key: "from", label: "From", value: from }
-        ];
-
-        fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
 
         const pass = await PKPass.from({
             model: modelPath,
@@ -74,37 +66,21 @@ app.get("/coupon", async (req, res) => {
         console.log("CRASH:", err);
         res.status(500).send(err.toString());
     }
-
 });
 
 /*
 Redeem coupon
 */
 app.get("/redeem/:id", (req, res) => {
-
     const id = req.params.id;
 
-    if (!coupons[id]) {
-        return res.send("Invalid coupon");
-    }
-
-    if (coupons[id].used) {
-        return res.send("Coupon already redeemed ❤️");
-    }
+    if (!coupons[id]) return res.send("Invalid coupon");
+    if (coupons[id].used) return res.send("Already used ❤️");
 
     coupons[id].used = true;
-
-    res.send(`Coupon Redeemed ❤️: ${coupons[id].text}`);
-
+    res.send(`Redeemed: ${coupons[id].text}`);
 });
 
-/*
-ROOT ROUTE (IMPORTANT)
-*/
-app.get("/", (req, res) => {
-    res.send("Server is running");
-});
-
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log("Running on port", PORT);
 });
