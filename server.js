@@ -63,8 +63,17 @@ app.get("/coupon", async (req, res) => {
         });
 
         // ensure arrays exist
-        pass.primaryFields = pass.primaryFields || [];
-        pass.secondaryFields = pass.secondaryFields || [];
+        pass.addField("primaryFields", {
+    key: "offer",
+    label: "",
+    value: couponText
+});
+
+pass.addField("secondaryFields", {
+    key: "from",
+    label: "From",
+    value: from
+});
         
 
         // main coupon
