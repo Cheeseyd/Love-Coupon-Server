@@ -5,19 +5,24 @@ const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 /*
-Simple coupon storage
+Simple coupon storage (SAFE)
 */
 const couponsPath = path.join(__dirname, "coupons.json");
 
 let coupons = {};
 
-if (fs.existsSync(couponsPath)) {
-    coupons = JSON.parse(fs.readFileSync(couponsPath));
+try {
+    if (fs.existsSync(couponsPath)) {
+        const data = fs.readFileSync(couponsPath, "utf8").trim();
+        coupons = data ? JSON.parse(data) : {};
+    }
+} catch {
+    console.log("Failed to load coupons.json");
+    coupons = {};
 }
-
 
 /*
 Generate coupon pass
@@ -34,6 +39,7 @@ app.get("/coupon", async (req, res) => {
         from: from,
         used: false
     };
+
     fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
     try {
@@ -41,17 +47,17 @@ app.get("/coupon", async (req, res) => {
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
 
-        // 🔥 READ ORIGINAL TEMPLATE
-        let passData = JSON.parse(fs.readFileSync(passJsonPath));
+        // read template
+        let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
-        // 🔥 FORCE UNIQUE PASS
+        // unique pass
         passData.serialNumber = id;
         passData.authenticationToken = id;
 
-        // 🔥 WRITE TEMP CHANGES
+        // write temp changes
         fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
 
-        // 🔥 CREATE PASS
+        // create pass
         const pass = await PKPass.from({
             model: modelPath,
             certificates: {
@@ -62,31 +68,23 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ensure arrays exist
-        pass.fields = pass.fields || {};
+        // ✅ CORRECT FIELD SYSTEM (your version)
+        pass.primaryFields = pass.primaryFields || [];
+        pass.secondaryFields = pass.secondaryFields || [];
 
-pass.fields.primaryFields = pass.fields.primaryFields || [];
-pass.fields.secondaryFields = pass.fields.secondaryFields || [];
+        pass.primaryFields.push({
+            key: "offer",
+            label: "",
+            value: couponText
+        });
 
-pass.fields.primaryFields.push({
-    key: "offer",
-    label: "",
-    value: couponText
-});
+        pass.secondaryFields.push({
+            key: "from",
+            label: "From",
+            value: from
+        });
 
-pass.fields.secondaryFields.push({
-    key: "from",
-    label: "From",
-    value: from
-});
-        
-
-        // main coupon
-        
-
-    
-
-        // QR code
+        // QR
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -108,7 +106,6 @@ pass.fields.secondaryFields.push({
 
 });
 
-
 /*
 Redeem coupon
 */
@@ -125,12 +122,12 @@ app.get("/redeem/:id", (req, res) => {
     }
 
     coupons[id].used = true;
+
     fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
     res.send(`Coupon Redeemed ❤️: ${coupons[id].text}`);
 
 });
-
 
 app.listen(PORT, () => {
     console.log("Coupon server running on port " + PORT);
