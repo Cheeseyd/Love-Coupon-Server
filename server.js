@@ -2,25 +2,26 @@ const express = require("express");
 const { PKPass } = require("passkit-generator");
 const fs = require("fs");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
+const Database = require("better-sqlite3");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-DATABASE SETUP
+DATABASE (persistent if using Render disk)
 */
-const db = new sqlite3.Database("./coupons.db");
+const db = new Database("/var/data/coupons.db");
 
-db.run(`
+// create table
+db.prepare(`
 CREATE TABLE IF NOT EXISTS coupons (
     id TEXT PRIMARY KEY,
     text TEXT,
     fromName TEXT,
     used INTEGER
 )
-`);
+`).run();
 
 /*
 ROOT
@@ -38,10 +39,9 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        db.run(
-            "INSERT INTO coupons (id, text, fromName, used) VALUES (?, ?, ?, 0)",
-            [id, couponText, from]
-        );
+        db.prepare(
+            "INSERT INTO coupons (id, text, fromName, used) VALUES (?, ?, ?, 0)"
+        ).run(id, couponText, from);
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
@@ -94,20 +94,19 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-Redeem coupon
+Redeem
 */
 app.get("/redeem/:id", (req, res) => {
     const id = req.params.id;
 
-    db.get("SELECT * FROM coupons WHERE id = ?", [id], (err, row) => {
-        if (!row) return res.send("Invalid coupon");
+    const row = db.prepare("SELECT * FROM coupons WHERE id = ?").get(id);
 
-        if (row.used) return res.send("Already used ❤️");
+    if (!row) return res.send("Invalid coupon");
+    if (row.used) return res.send("Already used ❤️");
 
-        db.run("UPDATE coupons SET used = 1 WHERE id = ?", [id]);
+    db.prepare("UPDATE coupons SET used = 1 WHERE id = ?").run(id);
 
-        res.send(`Redeemed: ${row.text}`);
-    });
+    res.send(`Redeemed: ${row.text}`);
 });
 
 app.listen(PORT, "0.0.0.0", () => {
