@@ -20,7 +20,6 @@ try {
         coupons = data ? JSON.parse(data) : {};
     }
 } catch {
-    console.log("Failed to load coupons.json");
     coupons = {};
 }
 
@@ -47,17 +46,36 @@ app.get("/coupon", async (req, res) => {
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
 
-        // read template
+        // READ TEMPLATE
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
-        // unique pass
+        // UNIQUE PASS
         passData.serialNumber = id;
         passData.authenticationToken = id;
 
-        // write temp changes
+        // ✅ SET FIELDS (CORRECT WAY)
+        passData.generic = passData.generic || {};
+
+        passData.generic.primaryFields = [
+            {
+                key: "offer",
+                label: "",
+                value: couponText
+            }
+        ];
+
+        passData.generic.secondaryFields = [
+            {
+                key: "from",
+                label: "From",
+                value: from
+            }
+        ];
+
+        // WRITE TEMP CHANGES
         fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
 
-        // create pass
+        // CREATE PASS
         const pass = await PKPass.from({
             model: modelPath,
             certificates: {
@@ -66,22 +84,6 @@ app.get("/coupon", async (req, res) => {
                 signerKey: fs.readFileSync("certs/passKey.pem"),
                 signerKeyPassphrase: "password"
             }
-        });
-
-        // ✅ CORRECT FIELD SYSTEM (your version)
-        pass.primaryFields = pass.primaryFields || [];
-        pass.secondaryFields = pass.secondaryFields || [];
-
-        pass.primaryFields.push({
-            key: "offer",
-            label: "",
-            value: couponText
-        });
-
-        pass.secondaryFields.push({
-            key: "from",
-            label: "From",
-            value: from
         });
 
         // QR
