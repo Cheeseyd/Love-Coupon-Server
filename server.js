@@ -2,15 +2,25 @@ const express = require("express");
 const { PKPass } = require("passkit-generator");
 const fs = require("fs");
 const path = require("path");
+const Database = require("better-sqlite3");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-TEMP: NO DATABASE (so deploy works)
+✅ USE RENDER DISK
 */
-let coupons = {};
+const db = new Database("/var/data/coupons.db");
+
+db.prepare(`
+CREATE TABLE IF NOT EXISTS coupons (
+    id TEXT PRIMARY KEY,
+    text TEXT,
+    fromName TEXT,
+    used INTEGER
+)
+`).run();
 
 /*
 ROOT
@@ -28,7 +38,9 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        coupons[id] = { text: couponText, from, used: false };
+        db.prepare(
+            "INSERT INTO coupons (id, text, fromName, used) VALUES (?, ?, ?, 0)"
+        ).run(id, couponText, from);
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
@@ -81,16 +93,19 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-Redeem
+Redeem coupon
 */
 app.get("/redeem/:id", (req, res) => {
     const id = req.params.id;
 
-    if (!coupons[id]) return res.send("Invalid coupon");
-    if (coupons[id].used) return res.send("Already used ❤️");
+    const row = db.prepare("SELECT * FROM coupons WHERE id = ?").get(id);
 
-    coupons[id].used = true;
-    res.send(`Redeemed: ${coupons[id].text}`);
+    if (!row) return res.send("Invalid coupon");
+    if (row.used) return res.send("Already used ❤️");
+
+    db.prepare("UPDATE coupons SET used = 1 WHERE id = ?").run(id);
+
+    res.send(`Redeemed: ${row.text}`);
 });
 
 app.listen(PORT, "0.0.0.0", () => {
