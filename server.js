@@ -2,26 +2,25 @@ const express = require("express");
 const { PKPass } = require("passkit-generator");
 const fs = require("fs");
 const path = require("path");
+const sqlite3 = require("sqlite3").verbose();
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-PERSISTENT STORAGE
+DATABASE SETUP
 */
-const couponsPath = path.join(__dirname, "coupons.json");
+const db = new sqlite3.Database("./coupons.db");
 
-let coupons = {};
-
-try {
-    if (fs.existsSync(couponsPath)) {
-        const data = fs.readFileSync(couponsPath, "utf8").trim();
-        coupons = data ? JSON.parse(data) : {};
-    }
-} catch {
-    coupons = {};
-}
+db.run(`
+CREATE TABLE IF NOT EXISTS coupons (
+    id TEXT PRIMARY KEY,
+    text TEXT,
+    fromName TEXT,
+    used INTEGER
+)
+`);
 
 /*
 ROOT
@@ -39,8 +38,10 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        coupons[id] = { text: couponText, from, used: false };
-        fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
+        db.run(
+            "INSERT INTO coupons (id, text, fromName, used) VALUES (?, ?, ?, 0)",
+            [id, couponText, from]
+        );
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
@@ -93,18 +94,20 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-Redeem
+Redeem coupon
 */
 app.get("/redeem/:id", (req, res) => {
     const id = req.params.id;
 
-    if (!coupons[id]) return res.send("Invalid coupon");
-    if (coupons[id].used) return res.send("Already used ❤️");
+    db.get("SELECT * FROM coupons WHERE id = ?", [id], (err, row) => {
+        if (!row) return res.send("Invalid coupon");
 
-    coupons[id].used = true;
-    fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
+        if (row.used) return res.send("Already used ❤️");
 
-    res.send(`Redeemed: ${coupons[id].text}`);
+        db.run("UPDATE coupons SET used = 1 WHERE id = ?", [id]);
+
+        res.send(`Redeemed: ${row.text}`);
+    });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
