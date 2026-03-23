@@ -7,27 +7,17 @@ const { v4: uuidv4 } = require("uuid");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/*
-NO STORAGE (just to get server working again)
-*/
 let coupons = {};
 
 /*
-ROOT TEST (CRITICAL)
+ROOT
 */
 app.get("/", (req, res) => {
-    res.send("SERVER WORKING");
+    res.send("OK");
 });
 
 /*
-TEST ROUTE
-*/
-app.get("/test", (req, res) => {
-    res.send("TEST OK");
-});
-
-/*
-Generate coupon pass
+Generate coupon pass (FIXED)
 */
 app.get("/coupon", async (req, res) => {
     try {
@@ -38,6 +28,27 @@ app.get("/coupon", async (req, res) => {
         coupons[id] = { text: couponText, from, used: false };
 
         const modelPath = path.join(__dirname, "model.pass");
+        const passJsonPath = path.join(modelPath, "pass.json");
+
+        // 🔥 FIX pass.json BEFORE building
+        let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
+
+        passData.serialNumber = id;
+        passData.authenticationToken = id;
+
+        // REQUIRED FIXES
+        passData.logoText = " "; // cannot be empty
+        passData.description = "Coupon";
+
+        passData.generic = passData.generic || {};
+        passData.generic.primaryFields = [
+            { key: "offer", label: "", value: couponText }
+        ];
+        passData.generic.secondaryFields = [
+            { key: "from", label: "From", value: from }
+        ];
+
+        fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
 
         const pass = await PKPass.from({
             model: modelPath,
@@ -69,7 +80,7 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-Redeem coupon
+Redeem
 */
 app.get("/redeem/:id", (req, res) => {
     const id = req.params.id;
