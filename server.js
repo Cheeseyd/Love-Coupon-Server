@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-Simple coupon storage (SAFE)
+SAFE coupon storage (won’t crash if file missing/bad)
 */
 const couponsPath = path.join(__dirname, "coupons.json");
 
@@ -19,7 +19,8 @@ try {
         const data = fs.readFileSync(couponsPath, "utf8").trim();
         coupons = data ? JSON.parse(data) : {};
     }
-} catch {
+} catch (err) {
+    console.log("Coupons load failed:", err);
     coupons = {};
 }
 
@@ -28,32 +29,28 @@ Generate coupon pass
 */
 app.get("/coupon", async (req, res) => {
 
-    const couponText = req.query.text || "Free Hug";
-    const from = req.query.from || "Someone ❤️";
-
-    const id = uuidv4();
-
-    coupons[id] = {
-        text: couponText,
-        from: from,
-        used: false
-    };
-
-    fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
-
     try {
+
+        const couponText = req.query.text || "Free Hug";
+        const from = req.query.from || "Someone ❤️";
+        const id = uuidv4();
+
+        coupons[id] = {
+            text: couponText,
+            from: from,
+            used: false
+        };
+
+        fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
 
-        // READ TEMPLATE
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
-        // UNIQUE PASS
         passData.serialNumber = id;
         passData.authenticationToken = id;
 
-        // SET FIELDS
         passData.generic = passData.generic || {};
         passData.generic.primaryFields = [
             { key: "offer", label: "", value: couponText }
@@ -62,10 +59,8 @@ app.get("/coupon", async (req, res) => {
             { key: "from", label: "From", value: from }
         ];
 
-        // WRITE TEMP CHANGES
         fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
 
-        // CREATE PASS
         const pass = await PKPass.from({
             model: modelPath,
             certificates: {
@@ -76,7 +71,6 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // QR
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -91,8 +85,7 @@ app.get("/coupon", async (req, res) => {
         res.send(pass.getAsBuffer());
 
     } catch (err) {
-        console.log("PASS ERROR:");
-        console.log(err);
+        console.log("CRASH:", err);
         res.status(500).send(err.toString());
     }
 
@@ -121,10 +114,13 @@ app.get("/redeem/:id", (req, res) => {
 
 });
 
+/*
+Health check (prevents "site cannot be reached")
+*/
 app.get("/", (req, res) => {
-    res.send("Server running");
+    res.send("OK");
 });
 
 app.listen(PORT, () => {
-    console.log("Coupon server running on port " + PORT);
+    console.log("Running on port", PORT);
 });
