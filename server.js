@@ -9,11 +9,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-DATABASE (persistent if using Render disk)
+DATABASE (RENDER DISK REQUIRED)
 */
 const db = new Database("/var/data/coupons.db");
 
-// create table
 db.prepare(`
 CREATE TABLE IF NOT EXISTS coupons (
     id TEXT PRIMARY KEY,
@@ -94,7 +93,7 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-Redeem
+Redeem coupon
 */
 app.get("/redeem/:id", (req, res) => {
     const id = req.params.id;
