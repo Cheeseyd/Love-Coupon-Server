@@ -7,7 +7,21 @@ const { v4: uuidv4 } = require("uuid");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+/*
+PERSISTENT STORAGE
+*/
+const couponsPath = path.join(__dirname, "coupons.json");
+
 let coupons = {};
+
+try {
+    if (fs.existsSync(couponsPath)) {
+        const data = fs.readFileSync(couponsPath, "utf8").trim();
+        coupons = data ? JSON.parse(data) : {};
+    }
+} catch {
+    coupons = {};
+}
 
 /*
 ROOT
@@ -17,7 +31,7 @@ app.get("/", (req, res) => {
 });
 
 /*
-Generate coupon pass (FIXED)
+Generate coupon
 */
 app.get("/coupon", async (req, res) => {
     try {
@@ -26,18 +40,17 @@ app.get("/coupon", async (req, res) => {
         const id = uuidv4();
 
         coupons[id] = { text: couponText, from, used: false };
+        fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
 
-        // 🔥 FIX pass.json BEFORE building
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
         passData.serialNumber = id;
         passData.authenticationToken = id;
 
-        // REQUIRED FIXES
-        passData.logoText = " "; // cannot be empty
+        passData.logoText = " ";
         passData.description = "Coupon";
 
         passData.generic = passData.generic || {};
@@ -89,6 +102,8 @@ app.get("/redeem/:id", (req, res) => {
     if (coupons[id].used) return res.send("Already used ❤️");
 
     coupons[id].used = true;
+    fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
+
     res.send(`Redeemed: ${coupons[id].text}`);
 });
 
