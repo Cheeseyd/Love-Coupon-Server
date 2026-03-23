@@ -8,21 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /*
-SAFE coupon storage (won’t crash if file missing/bad)
+TEMP: disable file storage (Render disk issues)
 */
-const couponsPath = path.join(__dirname, "coupons.json");
-
 let coupons = {};
-
-try {
-    if (fs.existsSync(couponsPath)) {
-        const data = fs.readFileSync(couponsPath, "utf8").trim();
-        coupons = data ? JSON.parse(data) : {};
-    }
-} catch (err) {
-    console.log("Coupons load failed:", err);
-    coupons = {};
-}
 
 /*
 Generate coupon pass
@@ -40,8 +28,6 @@ app.get("/coupon", async (req, res) => {
             from: from,
             used: false
         };
-
-        fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
@@ -108,17 +94,15 @@ app.get("/redeem/:id", (req, res) => {
 
     coupons[id].used = true;
 
-    fs.writeFileSync(couponsPath, JSON.stringify(coupons, null, 2));
-
     res.send(`Coupon Redeemed ❤️: ${coupons[id].text}`);
 
 });
 
 /*
-Health check (prevents "site cannot be reached")
+ROOT ROUTE (IMPORTANT)
 */
 app.get("/", (req, res) => {
-    res.send("OK");
+    res.send("Server is running");
 });
 
 app.listen(PORT, () => {
