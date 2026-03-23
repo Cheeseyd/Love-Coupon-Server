@@ -53,23 +53,13 @@ app.get("/coupon", async (req, res) => {
         passData.serialNumber = id;
         passData.authenticationToken = id;
 
-        // ✅ SET FIELDS (CORRECT WAY)
+        // SET FIELDS
         passData.generic = passData.generic || {};
-
         passData.generic.primaryFields = [
-            {
-                key: "offer",
-                label: "",
-                value: couponText
-            }
+            { key: "offer", label: "", value: couponText }
         ];
-
         passData.generic.secondaryFields = [
-            {
-                key: "from",
-                label: "From",
-                value: from
-            }
+            { key: "from", label: "From", value: from }
         ];
 
         // WRITE TEMP CHANGES
@@ -79,9 +69,9 @@ app.get("/coupon", async (req, res) => {
         const pass = await PKPass.from({
             model: modelPath,
             certificates: {
-                wwdr: fs.readFileSync("certs/wwdr.pem"),
-                signerCert: fs.readFileSync("certs/passCert.pem"),
-                signerKey: fs.readFileSync("certs/passKey.pem"),
+                wwdr: fs.readFileSync(path.join(__dirname, "certs/wwdr.pem")),
+                signerCert: fs.readFileSync(path.join(__dirname, "certs/passCert.pem")),
+                signerKey: fs.readFileSync(path.join(__dirname, "certs/passKey.pem")),
                 signerKeyPassphrase: "password"
             }
         });
@@ -129,6 +119,10 @@ app.get("/redeem/:id", (req, res) => {
 
     res.send(`Coupon Redeemed ❤️: ${coupons[id].text}`);
 
+});
+
+app.get("/", (req, res) => {
+    res.send("Server running");
 });
 
 app.listen(PORT, () => {
