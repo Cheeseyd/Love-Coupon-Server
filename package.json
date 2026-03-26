@@ -2,20 +2,18 @@
   "name": "love",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@supabase/supabase-js": "^2.100.0",
-    "apm": "^1.0.2",
-    "apn": "^2.2.0",
+    "apn": "2.2.0",
     "better-sqlite3": "^12.8.0",
-    "express": "^5.2.1",
+    "express": "^4.18.2",
     "passkit-generator": "^3.5.7",
     "uuid": "^13.0.0"
   }
