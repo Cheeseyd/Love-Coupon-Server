@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
+    "apm": "^1.0.2",
     "better-sqlite3": "^12.8.0",
     "express": "^5.2.1",
     "passkit-generator": "^3.5.7",
