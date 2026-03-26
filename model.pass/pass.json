@@ -4,10 +4,14 @@
   "serialNumber": "123456",
   "teamIdentifier": "62V445535C",
   "organizationName": "Love Coupons",
-  "description": "",
-  "logoText": "",
+  "description": "Coupon",
+  "logoText": " ",
   "foregroundColor": "rgb(255,255,255)",
   "backgroundColor": "rgb(255,105,180)",
+
+  "webServiceURL": "https://love-coupon-server.onrender.com",
+  "authenticationToken": "temp",
+
   "generic": {
     "primaryFields": []
   }
