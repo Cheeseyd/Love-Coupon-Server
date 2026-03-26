@@ -1,4 +1,4 @@
-// 🔥 FULL SERVER (WITH WALLET LIVE UPDATES + PUSH NOTIFICATIONS)
+// 🔥 FULL SERVER (FINAL — WALLET UPDATES + PUSH + DB FIX)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -14,7 +14,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 /*
-DATABASE (Render disk required: /var/data)
+DATABASE (Render disk: /var/data)
 */
 const db = new Database("/var/data/coupons.db");
 
@@ -23,22 +23,24 @@ CREATE TABLE IF NOT EXISTS coupons (
     id TEXT PRIMARY KEY,
     text TEXT,
     fromName TEXT,
-    used INTEGER,
-    deviceLibraryIdentifier TEXT,
-    pushToken TEXT
+    used INTEGER
 )
 `).run();
+
+// ✅ ADD NEW COLUMNS IF MISSING (no crash)
+try { db.prepare(`ALTER TABLE coupons ADD COLUMN deviceLibraryIdentifier TEXT`).run(); } catch {}
+try { db.prepare(`ALTER TABLE coupons ADD COLUMN pushToken TEXT`).run(); } catch {}
 
 /*
 APNs SETUP
 */
 const apnProvider = new apn.Provider({
     token: {
-        key: path.join(__dirname, "certs/AuthKey.p8"), // 🔴 put your .p8 here
-        keyId: "8BDDYR5URM",                          // 🔴 replace
-        teamId: "62V445535C"                           // ✅ your team id
+        key: path.join(__dirname, "certs/AuthKey.p8"),
+        keyId: "YOUR_KEY_ID",              // 🔴 CHANGE THIS
+        teamId: "62V445535C"
     },
-    production: true
+    production: false // 🧪 use false for now
 });
 
 /*
@@ -98,10 +100,7 @@ app.get("/coupon", async (req, res) => {
             messageEncoding: "iso-8859-1"
         });
 
-        res.set({
-            "Content-Type": "application/vnd.apple.pkpass"
-        });
-
+        res.set({ "Content-Type": "application/vnd.apple.pkpass" });
         res.send(pass.getAsBuffer());
 
     } catch (err) {
@@ -130,9 +129,7 @@ app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier
 GET UPDATED PASSES
 */
 app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier", (req, res) => {
-    const updated = db.prepare(`
-        SELECT id FROM coupons WHERE used = 1
-    `).all();
+    const updated = db.prepare(`SELECT id FROM coupons WHERE used = 1`).all();
 
     res.json({
         serialNumbers: updated.map(c => c.id),
@@ -188,10 +185,7 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    res.set({
-        "Content-Type": "application/vnd.apple.pkpass"
-    });
-
+    res.set({ "Content-Type": "application/vnd.apple.pkpass" });
     res.send(pass.getAsBuffer());
 });
 
@@ -208,10 +202,9 @@ app.get("/redeem/:id", async (req, res) => {
 
     db.prepare("UPDATE coupons SET used = 1 WHERE id = ?").run(id);
 
-    // 🔥 SEND PUSH NOTIFICATION
     if (coupon.pushToken) {
         const note = new apn.Notification();
-        note.topic = "pass.com.dillybarproductions.coupons"; // must match passTypeIdentifier
+        note.topic = "pass.com.dillybarproductions.coupons";
         note.contentAvailable = 1;
 
         try {
@@ -220,6 +213,8 @@ app.get("/redeem/:id", async (req, res) => {
         } catch (err) {
             console.log("Push error:", err);
         }
+    } else {
+        console.log("No push token (user hasn’t opened pass yet)");
     }
 
     res.send(`Redeemed: ${coupon.text}`);
