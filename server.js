@@ -1,4 +1,4 @@
-// 🔥 FULL SERVER (QR FIXED + WALLET UPDATES + PUSH + DB SAFE)
+// 🔥 FULL SERVER (FINAL — REGISTRATION DEBUG + PUSH + QR FIX + WALLET UPDATES)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -14,7 +14,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 /*
-DATABASE (Render disk: /var/data)
+DATABASE
 */
 const db = new Database("/var/data/coupons.db");
 
@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS coupons (
 )
 `).run();
 
-// add columns if missing
 try { db.prepare(`ALTER TABLE coupons ADD COLUMN deviceLibraryIdentifier TEXT`).run(); } catch {}
 try { db.prepare(`ALTER TABLE coupons ADD COLUMN pushToken TEXT`).run(); } catch {}
 
@@ -37,7 +36,7 @@ APNs
 const apnProvider = new apn.Provider({
     token: {
         key: path.join(__dirname, "certs/AuthKey.p8"),
-        keyId: "YOUR_KEY_ID", // 🔴 change
+        keyId: "YOUR_KEY_ID", // 🔴 CHANGE THIS
         teamId: "62V445535C"
     },
     production: false
@@ -68,14 +67,13 @@ app.get("/coupon", async (req, res) => {
 
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
-        // required
+        // REQUIRED FOR WALLET
         passData.serialNumber = id;
         passData.authenticationToken = id;
         passData.webServiceURL = "https://love-coupon-server.onrender.com";
         passData.description = "Coupon";
         passData.logoText = " ";
 
-        // fields
         passData.generic = {
             primaryFields: [
                 { key: "offer", label: "", value: couponText }
@@ -97,9 +95,9 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ✅ QR FIX (both formats)
         const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
 
+        // ✅ QR FIX
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: qr,
@@ -125,11 +123,16 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-REGISTER DEVICE
+🔥 REGISTER DEVICE (DEBUG ENABLED)
 */
 app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", (req, res) => {
     const { deviceLibraryIdentifier, serialNumber } = req.params;
     const pushToken = req.body.pushToken;
+
+    console.log("🔥 REGISTERED DEVICE");
+    console.log("Device:", deviceLibraryIdentifier);
+    console.log("Serial:", serialNumber);
+    console.log("PushToken:", pushToken);
 
     db.prepare(`
         UPDATE coupons
@@ -141,9 +144,11 @@ app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier
 });
 
 /*
-CHECK UPDATES
+CHECK FOR UPDATES
 */
 app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier", (req, res) => {
+    console.log("📡 Wallet checking for updates");
+
     const updated = db.prepare(`SELECT id FROM coupons WHERE used = 1`).all();
 
     res.json({
@@ -157,6 +162,8 @@ SERVE UPDATED PASS
 */
 app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const { serialNumber } = req.params;
+
+    console.log("📦 Serving updated pass:", serialNumber);
 
     const coupon = db.prepare("SELECT * FROM coupons WHERE id = ?").get(serialNumber);
     if (!coupon) return res.sendStatus(404);
@@ -201,7 +208,6 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    // ✅ ensure QR still exists after update
     const qr = `https://love-coupon-server.onrender.com/redeem/${serialNumber}`;
 
     pass.setBarcodes({
@@ -224,7 +230,7 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
 });
 
 /*
-REDEEM
+REDEEM (SEND PUSH)
 */
 app.get("/redeem/:id", async (req, res) => {
     const id = req.params.id;
@@ -243,10 +249,12 @@ app.get("/redeem/:id", async (req, res) => {
 
         try {
             await apnProvider.send(note, coupon.pushToken);
-            console.log("Push sent");
+            console.log("🚀 Push sent");
         } catch (err) {
             console.log("Push error:", err);
         }
+    } else {
+        console.log("❌ No push token (NOT REGISTERED)");
     }
 
     res.send(`Redeemed: ${coupon.text}`);
