@@ -68,19 +68,31 @@ app.get("/coupon", async (req, res) => {
 
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
+        // ✅ REQUIRED FOR WALLET UPDATES
         passData.serialNumber = id;
         passData.authenticationToken = id;
         passData.webServiceURL = "https://love-coupon-server.onrender.com";
-        passData.logoText = " ";
-        passData.description = "Coupon";
 
-        passData.generic = passData.generic || {};
-        passData.generic.primaryFields = [
-            { key: "offer", label: "", value: couponText }
-        ];
-        passData.generic.secondaryFields = [
-            { key: "from", label: "From", value: from }
-        ];
+        passData.description = "Coupon";
+        passData.logoText = " ";
+
+        // ✅ KEEP STRUCTURE CLEAN
+        passData.generic = {
+            primaryFields: [
+                {
+                    key: "offer",
+                    label: "",
+                    value: couponText
+                }
+            ],
+            secondaryFields: [
+                {
+                    key: "from",
+                    label: "From",
+                    value: from
+                }
+            ]
+        };
 
         fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
 
@@ -94,13 +106,17 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
+        // ✅ THIS FIXES MISSING QR
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
             messageEncoding: "iso-8859-1"
         });
 
-        res.set({ "Content-Type": "application/vnd.apple.pkpass" });
+        res.set({
+            "Content-Type": "application/vnd.apple.pkpass"
+        });
+
         res.send(pass.getAsBuffer());
 
     } catch (err) {
