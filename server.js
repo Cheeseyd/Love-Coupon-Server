@@ -1,4 +1,4 @@
-// 🔥 FULL SERVER (FINAL — WALLET UPDATES + PUSH + DB FIX)
+// 🔥 FULL SERVER (QR FIXED + WALLET UPDATES + PUSH + DB SAFE)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -27,20 +27,20 @@ CREATE TABLE IF NOT EXISTS coupons (
 )
 `).run();
 
-// ✅ ADD NEW COLUMNS IF MISSING (no crash)
+// add columns if missing
 try { db.prepare(`ALTER TABLE coupons ADD COLUMN deviceLibraryIdentifier TEXT`).run(); } catch {}
 try { db.prepare(`ALTER TABLE coupons ADD COLUMN pushToken TEXT`).run(); } catch {}
 
 /*
-APNs SETUP
+APNs
 */
 const apnProvider = new apn.Provider({
     token: {
         key: path.join(__dirname, "certs/AuthKey.p8"),
-        keyId: "YOUR_KEY_ID",              // 🔴 CHANGE THIS
+        keyId: "YOUR_KEY_ID", // 🔴 change
         teamId: "62V445535C"
     },
-    production: false // 🧪 use false for now
+    production: false
 });
 
 /*
@@ -68,29 +68,20 @@ app.get("/coupon", async (req, res) => {
 
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
-        // ✅ REQUIRED FOR WALLET UPDATES
+        // required
         passData.serialNumber = id;
         passData.authenticationToken = id;
         passData.webServiceURL = "https://love-coupon-server.onrender.com";
-
         passData.description = "Coupon";
         passData.logoText = " ";
 
-        // ✅ KEEP STRUCTURE CLEAN
+        // fields
         passData.generic = {
             primaryFields: [
-                {
-                    key: "offer",
-                    label: "",
-                    value: couponText
-                }
+                { key: "offer", label: "", value: couponText }
             ],
             secondaryFields: [
-                {
-                    key: "from",
-                    label: "From",
-                    value: from
-                }
+                { key: "from", label: "From", value: from }
             ]
         };
 
@@ -106,12 +97,20 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ✅ THIS FIXES MISSING QR
+        // ✅ QR FIX (both formats)
+        const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
+
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
-            message: `https://love-coupon-server.onrender.com/redeem/${id}`,
+            message: qr,
             messageEncoding: "iso-8859-1"
         });
+
+        pass.barcode = {
+            format: "PKBarcodeFormatQR",
+            message: qr,
+            messageEncoding: "iso-8859-1"
+        };
 
         res.set({
             "Content-Type": "application/vnd.apple.pkpass"
@@ -126,7 +125,7 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-REGISTER DEVICE (Wallet calls this)
+REGISTER DEVICE
 */
 app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", (req, res) => {
     const { deviceLibraryIdentifier, serialNumber } = req.params;
@@ -142,7 +141,7 @@ app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier
 });
 
 /*
-GET UPDATED PASSES
+CHECK UPDATES
 */
 app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier", (req, res) => {
     const updated = db.prepare(`SELECT id FROM coupons WHERE used = 1`).all();
@@ -170,20 +169,21 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     passData.serialNumber = serialNumber;
     passData.authenticationToken = serialNumber;
     passData.webServiceURL = "https://love-coupon-server.onrender.com";
-    passData.logoText = " ";
     passData.description = "Coupon";
+    passData.logoText = " ";
 
-    passData.generic.primaryFields = [
-        {
-            key: "offer",
-            label: "",
-            value: coupon.used ? "USED ❤️" : coupon.text
-        }
-    ];
-
-    passData.generic.secondaryFields = [
-        { key: "from", label: "From", value: coupon.fromName }
-    ];
+    passData.generic = {
+        primaryFields: [
+            {
+                key: "offer",
+                label: "",
+                value: coupon.used ? "USED ❤️" : coupon.text
+            }
+        ],
+        secondaryFields: [
+            { key: "from", label: "From", value: coupon.fromName }
+        ]
+    };
 
     if (coupon.used) {
         passData.voided = true;
@@ -201,12 +201,30 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    res.set({ "Content-Type": "application/vnd.apple.pkpass" });
+    // ✅ ensure QR still exists after update
+    const qr = `https://love-coupon-server.onrender.com/redeem/${serialNumber}`;
+
+    pass.setBarcodes({
+        format: "PKBarcodeFormatQR",
+        message: qr,
+        messageEncoding: "iso-8859-1"
+    });
+
+    pass.barcode = {
+        format: "PKBarcodeFormatQR",
+        message: qr,
+        messageEncoding: "iso-8859-1"
+    };
+
+    res.set({
+        "Content-Type": "application/vnd.apple.pkpass"
+    });
+
     res.send(pass.getAsBuffer());
 });
 
 /*
-REDEEM (TRIGGERS PUSH)
+REDEEM
 */
 app.get("/redeem/:id", async (req, res) => {
     const id = req.params.id;
@@ -229,8 +247,6 @@ app.get("/redeem/:id", async (req, res) => {
         } catch (err) {
             console.log("Push error:", err);
         }
-    } else {
-        console.log("No push token (user hasn’t opened pass yet)");
     }
 
     res.send(`Redeemed: ${coupon.text}`);
