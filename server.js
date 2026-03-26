@@ -1,4 +1,4 @@
-// 🔥 FULL SERVER WITH APPLE WALLET LIVE UPDATES (MINIMAL WORKING SETUP)
+// 🔥 FULL SERVER (WITH WALLET LIVE UPDATES + PUSH NOTIFICATIONS)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const Database = require("better-sqlite3");
 const { v4: uuidv4 } = require("uuid");
+const apn = require("apn");
 
 const app = express();
 app.use(express.json());
@@ -13,7 +14,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 /*
-DATABASE
+DATABASE (Render disk required: /var/data)
 */
 const db = new Database("/var/data/coupons.db");
 
@@ -27,6 +28,18 @@ CREATE TABLE IF NOT EXISTS coupons (
     pushToken TEXT
 )
 `).run();
+
+/*
+APNs SETUP
+*/
+const apnProvider = new apn.Provider({
+    token: {
+        key: path.join(__dirname, "certs/AuthKey.p8"), // 🔴 put your .p8 here
+        keyId: "8BDDYR5URM",                          // 🔴 replace
+        teamId: "62V445535C"                           // ✅ your team id
+    },
+    production: true
+});
 
 /*
 ROOT
@@ -92,7 +105,7 @@ app.get("/coupon", async (req, res) => {
         res.send(pass.getAsBuffer());
 
     } catch (err) {
-        console.log(err);
+        console.log("CREATE ERROR:", err);
         res.status(500).send(err.toString());
     }
 });
@@ -134,7 +147,6 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const { serialNumber } = req.params;
 
     const coupon = db.prepare("SELECT * FROM coupons WHERE id = ?").get(serialNumber);
-
     if (!coupon) return res.sendStatus(404);
 
     const modelPath = path.join(__dirname, "model.pass");
@@ -184,9 +196,9 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
 });
 
 /*
-REDEEM (TRIGGERS UPDATE)
+REDEEM (TRIGGERS PUSH)
 */
-app.get("/redeem/:id", (req, res) => {
+app.get("/redeem/:id", async (req, res) => {
     const id = req.params.id;
 
     const coupon = db.prepare("SELECT * FROM coupons WHERE id = ?").get(id);
@@ -196,8 +208,19 @@ app.get("/redeem/:id", (req, res) => {
 
     db.prepare("UPDATE coupons SET used = 1 WHERE id = ?").run(id);
 
-    // 🔥 HERE is where you'd send APNs push (advanced)
-    console.log("Coupon used → should trigger push update");
+    // 🔥 SEND PUSH NOTIFICATION
+    if (coupon.pushToken) {
+        const note = new apn.Notification();
+        note.topic = "pass.com.dillybarproductions.coupons"; // must match passTypeIdentifier
+        note.contentAvailable = 1;
+
+        try {
+            await apnProvider.send(note, coupon.pushToken);
+            console.log("Push sent");
+        } catch (err) {
+            console.log("Push error:", err);
+        }
+    }
 
     res.send(`Redeemed: ${coupon.text}`);
 });
