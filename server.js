@@ -1,10 +1,9 @@
-// 🔥 FINAL SERVER (WORKING: QR + PUSH + LIVE UPDATE + VISIBLE CHANGE)
+// 🔥 FULL SERVER (NO SQLITE — INSTANT DEPLOY, JSON STORAGE)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
 const fs = require("fs");
 const path = require("path");
-const Database = require("better-sqlite3");
 const { v4: uuidv4 } = require("uuid");
 const apn = require("apn");
 
@@ -14,21 +13,23 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 /*
-DATABASE
+JSON STORAGE
 */
-const db = new Database("/var/data/coupons.db");
+const DATA_PATH = "/var/data/coupons.json";
 
-db.prepare(`
-CREATE TABLE IF NOT EXISTS coupons (
-    id TEXT PRIMARY KEY,
-    text TEXT,
-    fromName TEXT,
-    used INTEGER
-)
-`).run();
+let coupons = {};
 
-try { db.prepare(`ALTER TABLE coupons ADD COLUMN deviceLibraryIdentifier TEXT`).run(); } catch {}
-try { db.prepare(`ALTER TABLE coupons ADD COLUMN pushToken TEXT`).run(); } catch {}
+try {
+    if (fs.existsSync(DATA_PATH)) {
+        coupons = JSON.parse(fs.readFileSync(DATA_PATH, "utf8") || "{}");
+    }
+} catch {
+    coupons = {};
+}
+
+function saveCoupons() {
+    fs.writeFileSync(DATA_PATH, JSON.stringify(coupons, null, 2));
+}
 
 /*
 APNs
@@ -36,7 +37,7 @@ APNs
 const apnProvider = new apn.Provider({
     token: {
         key: path.join(__dirname, "certs/AuthKey.p8"),
-        keyId: "YOUR_KEY_ID", // 🔴 CHANGE THIS
+        keyId: "YOUR_KEY_ID", // 🔴 CHANGE
         teamId: "62V445535C"
     },
     production: false
@@ -58,9 +59,12 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        db.prepare(
-            "INSERT INTO coupons (id, text, fromName, used) VALUES (?, ?, ?, 0)"
-        ).run(id, couponText, from);
+        coupons[id] = {
+            text: couponText,
+            fromName: from,
+            used: false
+        };
+        saveCoupons();
 
         const modelPath = path.join(__dirname, "model.pass");
         const passJsonPath = path.join(modelPath, "pass.json");
@@ -126,11 +130,11 @@ app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier
 
     console.log("🔥 REGISTERED DEVICE");
 
-    db.prepare(`
-        UPDATE coupons
-        SET deviceLibraryIdentifier = ?, pushToken = ?
-        WHERE id = ?
-    `).run(deviceLibraryIdentifier, pushToken, serialNumber);
+    if (coupons[serialNumber]) {
+        coupons[serialNumber].deviceLibraryIdentifier = deviceLibraryIdentifier;
+        coupons[serialNumber].pushToken = pushToken;
+        saveCoupons();
+    }
 
     res.sendStatus(201);
 });
@@ -139,10 +143,12 @@ app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier
 CHECK UPDATES
 */
 app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier", (req, res) => {
-    const updated = db.prepare(`SELECT id FROM coupons WHERE used = 1`).all();
+    const updated = Object.entries(coupons)
+        .filter(([_, c]) => c.used)
+        .map(([id]) => id);
 
     res.json({
-        serialNumbers: updated.map(c => c.id),
+        serialNumbers: updated,
         lastUpdated: new Date().toISOString()
     });
 });
@@ -153,7 +159,7 @@ SERVE UPDATED PASS
 app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const { serialNumber } = req.params;
 
-    const coupon = db.prepare("SELECT * FROM coupons WHERE id = ?").get(serialNumber);
+    const coupon = coupons[serialNumber];
     if (!coupon) return res.sendStatus(404);
 
     const modelPath = path.join(__dirname, "model.pass");
@@ -225,14 +231,13 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
 REDEEM
 */
 app.get("/redeem/:id", async (req, res) => {
-    const id = req.params.id;
-
-    const coupon = db.prepare("SELECT * FROM coupons WHERE id = ?").get(id);
+    const coupon = coupons[req.params.id];
 
     if (!coupon) return res.send("Invalid coupon");
     if (coupon.used) return res.send("Already used ❤️");
 
-    db.prepare("UPDATE coupons SET used = 1 WHERE id = ?").run(id);
+    coupon.used = true;
+    saveCoupons();
 
     if (coupon.pushToken) {
         const note = new apn.Notification();
