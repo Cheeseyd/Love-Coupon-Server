@@ -1,4 +1,4 @@
-// 🔥 FULL SERVER (NO SQLITE — INSTANT DEPLOY, JSON STORAGE)
+// 🔥 FINAL SERVER (NO SQLITE, NO FILE CORRUPTION, QR + PUSH + LIVE UPDATE)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -13,7 +13,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 /*
-JSON STORAGE
+JSON STORAGE (PERSISTENT ON RENDER DISK)
 */
 const DATA_PATH = "/var/data/coupons.json";
 
@@ -37,7 +37,7 @@ APNs
 const apnProvider = new apn.Provider({
     token: {
         key: path.join(__dirname, "certs/AuthKey.p8"),
-        keyId: "YOUR_KEY_ID", // 🔴 CHANGE
+        keyId: "YOUR_KEY_ID", // 🔴 CHANGE THIS
         teamId: "62V445535C"
     },
     production: false
@@ -51,7 +51,7 @@ app.get("/", (req, res) => {
 });
 
 /*
-CREATE PASS
+CREATE PASS (NO FILE WRITES — SAFE)
 */
 app.get("/coupon", async (req, res) => {
     try {
@@ -66,30 +66,8 @@ app.get("/coupon", async (req, res) => {
         };
         saveCoupons();
 
-        const modelPath = path.join(__dirname, "model.pass");
-        const passJsonPath = path.join(modelPath, "pass.json");
-
-        let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
-
-        passData.serialNumber = id;
-        passData.authenticationToken = id;
-        passData.webServiceURL = "https://love-coupon-server.onrender.com";
-        passData.description = "Coupon";
-        passData.logoText = " ";
-
-        passData.generic = {
-            primaryFields: [
-                { key: "offer", label: "", value: couponText }
-            ],
-            secondaryFields: [
-                { key: "from", label: "From", value: from }
-            ]
-        };
-
-        fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
-
         const pass = await PKPass.from({
-            model: modelPath,
+            model: path.join(__dirname, "model.pass"),
             certificates: {
                 wwdr: fs.readFileSync(path.join(__dirname, "certs/wwdr.pem")),
                 signerCert: fs.readFileSync(path.join(__dirname, "certs/passCert.pem")),
@@ -98,6 +76,23 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
+        // REQUIRED
+        pass.serialNumber = id;
+        pass.authenticationToken = id;
+        pass.webServiceURL = "https://love-coupon-server.onrender.com";
+        pass.description = "Coupon";
+        pass.logoText = " ";
+
+        // FIELDS
+        pass.primaryFields = [
+            { key: "offer", label: "", value: couponText }
+        ];
+
+        pass.secondaryFields = [
+            { key: "from", label: "From", value: from }
+        ];
+
+        // QR
         const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
 
         pass.setBarcodes({
@@ -147,6 +142,8 @@ app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier"
         .filter(([_, c]) => c.used)
         .map(([id]) => id);
 
+    console.log("📡 Wallet checking →", updated);
+
     res.json({
         serialNumbers: updated,
         lastUpdated: new Date().toISOString()
@@ -154,7 +151,7 @@ app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier"
 });
 
 /*
-SERVE UPDATED PASS
+SERVE UPDATED PASS (NO FILE WRITES)
 */
 app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const { serialNumber } = req.params;
@@ -162,45 +159,8 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const coupon = coupons[serialNumber];
     if (!coupon) return res.sendStatus(404);
 
-    const modelPath = path.join(__dirname, "model.pass");
-    const passJsonPath = path.join(modelPath, "pass.json");
-
-    let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
-
-    passData.serialNumber = serialNumber;
-    passData.authenticationToken = serialNumber;
-    passData.webServiceURL = "https://love-coupon-server.onrender.com";
-    passData.description = "Coupon";
-    passData.logoText = " ";
-
-    passData.generic = {
-        primaryFields: [
-            {
-                key: "offer",
-                label: "",
-                value: coupon.used ? "USED ❤️" : coupon.text
-            }
-        ],
-        secondaryFields: [
-            { key: "from", label: "From", value: coupon.fromName }
-        ],
-        auxiliaryFields: [
-            {
-                key: "status",
-                label: "",
-                value: coupon.used ? "Redeemed" : "Valid"
-            }
-        ]
-    };
-
-    if (coupon.used) {
-        passData.voided = true;
-    }
-
-    fs.writeFileSync(passJsonPath, JSON.stringify(passData, null, 2));
-
     const pass = await PKPass.from({
-        model: modelPath,
+        model: path.join(__dirname, "model.pass"),
         certificates: {
             wwdr: fs.readFileSync(path.join(__dirname, "certs/wwdr.pem")),
             signerCert: fs.readFileSync(path.join(__dirname, "certs/passCert.pem")),
@@ -208,6 +168,36 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
             signerKeyPassphrase: "password"
         }
     });
+
+    pass.serialNumber = serialNumber;
+    pass.authenticationToken = serialNumber;
+    pass.webServiceURL = "https://love-coupon-server.onrender.com";
+    pass.description = "Coupon";
+    pass.logoText = " ";
+
+    pass.primaryFields = [
+        {
+            key: "offer",
+            label: "",
+            value: coupon.used ? "USED ❤️" : coupon.text
+        }
+    ];
+
+    pass.secondaryFields = [
+        { key: "from", label: "From", value: coupon.fromName }
+    ];
+
+    pass.auxiliaryFields = [
+        {
+            key: "status",
+            label: "",
+            value: coupon.used ? "Redeemed" : "Valid"
+        }
+    ];
+
+    if (coupon.used) {
+        pass.voided = true;
+    }
 
     const qr = `https://love-coupon-server.onrender.com/redeem/${serialNumber}`;
 
