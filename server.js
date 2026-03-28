@@ -1,4 +1,4 @@
-// 🔥 FINAL SERVER (NO SQLITE, NO FILE CORRUPTION, QR + PUSH + LIVE UPDATE)
+// 🔥 FIXED SERVER (AUTH TOKEN + TYPE FIX)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -13,7 +13,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 /*
-JSON STORAGE (PERSISTENT ON RENDER DISK)
+JSON STORAGE
 */
 const DATA_PATH = "/var/data/coupons.json";
 
@@ -37,7 +37,7 @@ APNs
 const apnProvider = new apn.Provider({
     token: {
         key: path.join(__dirname, "certs/AuthKey.p8"),
-        keyId: "YOUR_KEY_ID", // 🔴 CHANGE THIS
+        keyId: "YOUR_KEY_ID",
         teamId: "62V445535C"
     },
     production: false
@@ -51,7 +51,7 @@ app.get("/", (req, res) => {
 });
 
 /*
-CREATE PASS (NO FILE WRITES — SAFE)
+CREATE PASS
 */
 app.get("/coupon", async (req, res) => {
     try {
@@ -76,14 +76,18 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // REQUIRED
+        // ✅ FIX: token must be 16+ chars
+        const token = id.replace(/-/g, "") + "123456";
+
         pass.serialNumber = id;
-        pass.authenticationToken = id;
+        pass.authenticationToken = token;
         pass.webServiceURL = "https://love-coupon-server.onrender.com";
         pass.description = "Coupon";
         pass.logoText = " ";
 
-        // FIELDS
+        // ✅ FIX: set correct type
+        pass.type = "generic";
+
         pass.primaryFields = [
             { key: "offer", label: "", value: couponText }
         ];
@@ -92,7 +96,6 @@ app.get("/coupon", async (req, res) => {
             { key: "from", label: "From", value: from }
         ];
 
-        // QR
         const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
 
         pass.setBarcodes({
@@ -142,8 +145,6 @@ app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier"
         .filter(([_, c]) => c.used)
         .map(([id]) => id);
 
-    console.log("📡 Wallet checking →", updated);
-
     res.json({
         serialNumbers: updated,
         lastUpdated: new Date().toISOString()
@@ -151,7 +152,7 @@ app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier"
 });
 
 /*
-SERVE UPDATED PASS (NO FILE WRITES)
+SERVE UPDATED PASS
 */
 app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const { serialNumber } = req.params;
@@ -169,11 +170,14 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
+    const token = serialNumber.replace(/-/g, "") + "123456";
+
     pass.serialNumber = serialNumber;
-    pass.authenticationToken = serialNumber;
+    pass.authenticationToken = token;
     pass.webServiceURL = "https://love-coupon-server.onrender.com";
     pass.description = "Coupon";
     pass.logoText = " ";
+    pass.type = "generic";
 
     pass.primaryFields = [
         {
