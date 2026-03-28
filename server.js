@@ -1,4 +1,4 @@
-// 🔥 FIXED SERVER (AUTH TOKEN + TYPE FIX)
+// 🔥 FINAL FIX — AUTH TOKEN GUARANTEED VALID (64 chars)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -46,9 +46,7 @@ const apnProvider = new apn.Provider({
 /*
 ROOT
 */
-app.get("/", (req, res) => {
-    res.send("OK");
-});
+app.get("/", (req, res) => res.send("OK"));
 
 /*
 CREATE PASS
@@ -59,10 +57,14 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
+        // ✅ ALWAYS VALID TOKEN (64 chars, no dashes)
+        const token = id.replace(/-/g, "").padEnd(64, "0");
+
         coupons[id] = {
             text: couponText,
             fromName: from,
-            used: false
+            used: false,
+            token
         };
         saveCoupons();
 
@@ -76,17 +78,13 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ✅ FIX: token must be 16+ chars
-        const token = id.replace(/-/g, "") + "123456";
+        pass.type = "generic";
 
         pass.serialNumber = id;
         pass.authenticationToken = token;
         pass.webServiceURL = "https://love-coupon-server.onrender.com";
         pass.description = "Coupon";
         pass.logoText = " ";
-
-        // ✅ FIX: set correct type
-        pass.type = "generic";
 
         pass.primaryFields = [
             { key: "offer", label: "", value: couponText }
@@ -170,14 +168,13 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    const token = serialNumber.replace(/-/g, "") + "123456";
+    pass.type = "generic";
 
     pass.serialNumber = serialNumber;
-    pass.authenticationToken = token;
+    pass.authenticationToken = coupon.token;
     pass.webServiceURL = "https://love-coupon-server.onrender.com";
     pass.description = "Coupon";
     pass.logoText = " ";
-    pass.type = "generic";
 
     pass.primaryFields = [
         {
