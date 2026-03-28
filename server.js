@@ -1,4 +1,4 @@
-// 🔥 FULL SERVER (FINAL — REGISTRATION DEBUG + PUSH + QR FIX + WALLET UPDATES)
+// 🔥 FINAL SERVER (WORKING: QR + PUSH + LIVE UPDATE + VISIBLE CHANGE)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -67,7 +67,6 @@ app.get("/coupon", async (req, res) => {
 
         let passData = JSON.parse(fs.readFileSync(passJsonPath, "utf8"));
 
-        // REQUIRED FOR WALLET
         passData.serialNumber = id;
         passData.authenticationToken = id;
         passData.webServiceURL = "https://love-coupon-server.onrender.com";
@@ -97,7 +96,6 @@ app.get("/coupon", async (req, res) => {
 
         const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
 
-        // ✅ QR FIX
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: qr,
@@ -110,10 +108,7 @@ app.get("/coupon", async (req, res) => {
             messageEncoding: "iso-8859-1"
         };
 
-        res.set({
-            "Content-Type": "application/vnd.apple.pkpass"
-        });
-
+        res.set({ "Content-Type": "application/vnd.apple.pkpass" });
         res.send(pass.getAsBuffer());
 
     } catch (err) {
@@ -123,16 +118,13 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-🔥 REGISTER DEVICE (DEBUG ENABLED)
+REGISTER DEVICE
 */
 app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", (req, res) => {
     const { deviceLibraryIdentifier, serialNumber } = req.params;
     const pushToken = req.body.pushToken;
 
     console.log("🔥 REGISTERED DEVICE");
-    console.log("Device:", deviceLibraryIdentifier);
-    console.log("Serial:", serialNumber);
-    console.log("PushToken:", pushToken);
 
     db.prepare(`
         UPDATE coupons
@@ -144,11 +136,9 @@ app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier
 });
 
 /*
-CHECK FOR UPDATES
+CHECK UPDATES
 */
 app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier", (req, res) => {
-    console.log("📡 Wallet checking for updates");
-
     const updated = db.prepare(`SELECT id FROM coupons WHERE used = 1`).all();
 
     res.json({
@@ -162,8 +152,6 @@ SERVE UPDATED PASS
 */
 app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const { serialNumber } = req.params;
-
-    console.log("📦 Serving updated pass:", serialNumber);
 
     const coupon = db.prepare("SELECT * FROM coupons WHERE id = ?").get(serialNumber);
     if (!coupon) return res.sendStatus(404);
@@ -189,6 +177,13 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         ],
         secondaryFields: [
             { key: "from", label: "From", value: coupon.fromName }
+        ],
+        auxiliaryFields: [
+            {
+                key: "status",
+                label: "",
+                value: coupon.used ? "Redeemed" : "Valid"
+            }
         ]
     };
 
@@ -222,15 +217,12 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         messageEncoding: "iso-8859-1"
     };
 
-    res.set({
-        "Content-Type": "application/vnd.apple.pkpass"
-    });
-
+    res.set({ "Content-Type": "application/vnd.apple.pkpass" });
     res.send(pass.getAsBuffer());
 });
 
 /*
-REDEEM (SEND PUSH)
+REDEEM
 */
 app.get("/redeem/:id", async (req, res) => {
     const id = req.params.id;
@@ -253,8 +245,6 @@ app.get("/redeem/:id", async (req, res) => {
         } catch (err) {
             console.log("Push error:", err);
         }
-    } else {
-        console.log("❌ No push token (NOT REGISTERED)");
     }
 
     res.send(`Redeemed: ${coupon.text}`);
