@@ -1,4 +1,4 @@
-// 🔥 FINAL FIX — AUTH TOKEN GUARANTEED VALID (64 chars)
+// 🔥 FINAL SERVER (AUTH TOKEN FIXED FOR REAL — NO VALIDATION ERRORS)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -57,8 +57,8 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        // ✅ ALWAYS VALID TOKEN (64 chars, no dashes)
-        const token = id.replace(/-/g, "").padEnd(64, "0");
+        // ✅ GUARANTEED VALID TOKEN (32+ chars, no dashes)
+        const token = uuidv4().replace(/-/g, "") + uuidv4().replace(/-/g, "");
 
         coupons[id] = {
             text: couponText,
@@ -171,7 +171,7 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     pass.type = "generic";
 
     pass.serialNumber = serialNumber;
-    pass.authenticationToken = coupon.token;
+    pass.authenticationToken = coupon.token; // ✅ SAME TOKEN
     pass.webServiceURL = "https://love-coupon-server.onrender.com";
     pass.description = "Coupon";
     pass.logoText = " ";
