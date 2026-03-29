@@ -5,10 +5,25 @@
   "teamIdentifier": "62V445535C",
   "organizationName": "Love Coupons",
   "description": "Coupon",
-  "logoText": " ",
+  "logoText": "Love Coupon",
   "foregroundColor": "rgb(255,255,255)",
   "backgroundColor": "rgb(255,105,180)",
   "webServiceURL": "https://love-coupon-server.onrender.com",
   "authenticationToken": "1234567890123456",
-  "generic": {}
+  "generic": {
+    "primaryFields": [
+      {
+        "key": "offer",
+        "label": "Coupon",
+        "value": "Placeholder"
+      }
+    ],
+    "secondaryFields": [
+      {
+        "key": "from",
+        "label": "From",
+        "value": "Placeholder"
+      }
+    ]
+  }
 }
