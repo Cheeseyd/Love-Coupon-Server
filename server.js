@@ -254,6 +254,17 @@ app.get("/redeem/:id", async (req, res) => {
     res.send(`Redeemed: ${coupon.text}`);
 });
 
+app.get("/coupons", (req, res) => {
+    const list = Object.entries(coupons).map(([id, c]) => ({
+        id,
+        text: c.text,
+        from: c.from,
+        used: c.used
+    }));
+
+    res.json(list);
+});
+
 app.listen(PORT, () => {
     console.log("Running on port", PORT);
 });
