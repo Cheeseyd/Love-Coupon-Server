@@ -59,8 +59,7 @@ app.get("/coupon", async (req, res) => {
             text: couponText,
             from,
             used: false,
-            pushToken: null,
-            deviceLibraryIdentifier: null
+            pushToken: null
         };
         saveCoupons();
 
@@ -72,14 +71,21 @@ app.get("/coupon", async (req, res) => {
         base.webServiceURL = "https://love-coupon-server.onrender.com";
 
         base.generic = {
-            primaryFields: [{ key: "offer", label: "Coupon", value: couponText }],
-            secondaryFields: [{ key: "from", label: "From", value: from || "Someone ❤️" }]
+            primaryFields: [
+                { key: "offer", label: "Coupon", value: couponText }
+            ],
+            secondaryFields: [
+                { key: "from", label: "From", value: from || "Someone ❤️" }
+            ]
         };
 
         const tempPath = path.join(__dirname, `temp-${id}.pass`);
         fs.mkdirSync(tempPath);
 
-        fs.writeFileSync(path.join(tempPath, "pass.json"), JSON.stringify(base, null, 2));
+        fs.writeFileSync(
+            path.join(tempPath, "pass.json"),
+            JSON.stringify(base, null, 2)
+        );
 
         fs.readdirSync(modelPath).forEach(f => {
             if (f !== "pass.json") {
@@ -97,6 +103,7 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
+        // ✅ QR CODE
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -118,14 +125,13 @@ app.get("/coupon", async (req, res) => {
 REGISTER DEVICE
 */
 app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", (req, res) => {
-    const { deviceLibraryIdentifier, serialNumber } = req.params;
+    const { serialNumber } = req.params;
     const pushToken = req.body.pushToken;
 
     console.log("🔥 REGISTERED DEVICE");
 
     if (coupons[serialNumber]) {
         coupons[serialNumber].pushToken = pushToken;
-        coupons[serialNumber].deviceLibraryIdentifier = deviceLibraryIdentifier;
         saveCoupons();
     }
 
@@ -165,16 +171,20 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     base.webServiceURL = "https://love-coupon-server.onrender.com";
 
     base.generic = {
-        primaryFields: [{
-            key: "offer",
-            label: "Coupon",
-            value: coupon.used ? "USED ❤️" : coupon.text
-        }],
-        secondaryFields: [{
-            key: "from",
-            label: "From",
-            value: coupon.from || "Someone ❤️"
-        }]
+        primaryFields: [
+            {
+                key: "offer",
+                label: "Coupon",
+                value: coupon.used ? "USED ❤️" : coupon.text
+            }
+        ],
+        secondaryFields: [
+            {
+                key: "from",
+                label: "From",
+                value: coupon.from || "Someone ❤️"
+            }
+        ]
     };
 
     if (coupon.used) base.voided = true;
@@ -182,7 +192,10 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const tempPath = path.join(__dirname, `temp-${serialNumber}.pass`);
     fs.mkdirSync(tempPath);
 
-    fs.writeFileSync(path.join(tempPath, "pass.json"), JSON.stringify(base, null, 2));
+    fs.writeFileSync(
+        path.join(tempPath, "pass.json"),
+        JSON.stringify(base, null, 2)
+    );
 
     fs.readdirSync(modelPath).forEach(f => {
         if (f !== "pass.json") {
@@ -198,6 +211,13 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
             signerKey: fs.readFileSync("certs/passKey.pem"),
             signerKeyPassphrase: "password"
         }
+    });
+
+    // ✅ CRITICAL FIX: QR AGAIN
+    pass.setBarcodes({
+        format: "PKBarcodeFormatQR",
+        message: `https://love-coupon-server.onrender.com/redeem/${serialNumber}`,
+        messageEncoding: "iso-8859-1"
     });
 
     res.set({ "Content-Type": "application/vnd.apple.pkpass" });
