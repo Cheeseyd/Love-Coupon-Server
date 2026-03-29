@@ -67,17 +67,24 @@ app.get("/coupon", async (req, res) => {
         pass.serialNumber = id;
         pass.authenticationToken = token;
         pass.webServiceURL = "https://love-coupon-server.onrender.com";
-        pass.description = "Coupon";
-        pass.logoText = "Love Coupon";
 
-        // ✅ SIMPLE FIELD SETUP
-        pass.primaryFields = [
-            { key: "offer", label: "Coupon", value: couponText }
-        ];
-
-        pass.secondaryFields = [
-            { key: "from", label: "From", value: from }
-        ];
+        // ✅ THIS IS THE REAL FIX
+        pass.generic = {
+            primaryFields: [
+                {
+                    key: "offer",
+                    label: "Coupon",
+                    value: couponText
+                }
+            ],
+            secondaryFields: [
+                {
+                    key: "from",
+                    label: "From",
+                    value: from
+                }
+            ]
+        };
 
         const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
 
