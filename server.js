@@ -1,4 +1,4 @@
-// 🔥 FINAL WORKING SERVER (FIELDS + QR + PUSH — CONFIRMED STRUCTURE)
+// 🔥 FINAL SERVER (WORKING — CORRECT TYPE + FIELDS + QR + PUSH)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -77,14 +77,16 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        pass.type = "generic";
+        // ✅ CORRECT TYPE
+        pass.setType("generic");
+
         pass.serialNumber = id;
         pass.authenticationToken = token;
         pass.webServiceURL = "https://love-coupon-server.onrender.com";
         pass.description = "Coupon";
         pass.logoText = " ";
 
-        // ✅ CORRECT FIELD METHOD
+        // ✅ FIELDS
         pass.primaryFields = [
             { key: "offer", label: "Coupon", value: couponText }
         ];
@@ -171,7 +173,8 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    pass.type = "generic";
+    pass.setType("generic");
+
     pass.serialNumber = serialNumber;
     pass.authenticationToken = coupon.token;
     pass.webServiceURL = "https://love-coupon-server.onrender.com";
