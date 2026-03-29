@@ -1,5 +1,3 @@
-// 🔥 FINAL CLEAN SERVER (WORKING — SIMPLE + RELIABLE)
-
 const express = require("express");
 const { PKPass } = require("passkit-generator");
 const fs = require("fs");
@@ -7,12 +5,10 @@ const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-app.use(express.json());
-
 const PORT = process.env.PORT || 3000;
 
 /*
-JSON STORAGE
+Simple storage
 */
 const DATA_PATH = "/var/data/coupons.json";
 
@@ -31,11 +27,6 @@ function saveCoupons() {
 }
 
 /*
-ROOT
-*/
-app.get("/", (req, res) => res.send("OK"));
-
-/*
 CREATE PASS
 */
 app.get("/coupon", async (req, res) => {
@@ -44,32 +35,28 @@ app.get("/coupon", async (req, res) => {
         const from = req.query.from || "Someone ❤️";
         const id = uuidv4();
 
-        const token = uuidv4().replace(/-/g, "") + uuidv4().replace(/-/g, "");
-
         coupons[id] = {
             text: couponText,
-            fromName: from,
-            used: false,
-            token
+            from: from,
+            used: false
         };
         saveCoupons();
 
-        const pass = await PKPass.from({
-            model: path.join(__dirname, "model.pass"),
-            certificates: {
-                wwdr: fs.readFileSync(path.join(__dirname, "certs/wwdr.pem")),
-                signerCert: fs.readFileSync(path.join(__dirname, "certs/passCert.pem")),
-                signerKey: fs.readFileSync(path.join(__dirname, "certs/passKey.pem")),
-                signerKeyPassphrase: "password"
-            }
-        });
+        const modelPath = path.join(__dirname, "model.pass");
+        const originalPath = path.join(modelPath, "pass.json");
 
-        pass.serialNumber = id;
-        pass.authenticationToken = token;
-        pass.webServiceURL = "https://love-coupon-server.onrender.com";
+        // ✅ CLONE TEMPLATE (DO NOT OVERWRITE ORIGINAL)
+        let passData = JSON.parse(fs.readFileSync(originalPath, "utf8"));
 
-        // ✅ THIS IS THE REAL FIX
-        pass.generic = {
+        passData.serialNumber = id;
+        passData.authenticationToken = id.replace(/-/g, "") + "123456";
+        passData.webServiceURL = "https://love-coupon-server.onrender.com";
+
+        passData.description = "Coupon";
+        passData.logoText = "Love Coupon";
+
+        // ✅ THIS IS THE KEY (THIS WORKS 100%)
+        passData.generic = {
             primaryFields: [
                 {
                     key: "offer",
@@ -86,25 +73,57 @@ app.get("/coupon", async (req, res) => {
             ]
         };
 
-        const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
+        // 🔥 WRITE TO TEMP FILE (NOT ORIGINAL)
+        const tempPath = path.join(__dirname, `temp-${id}.pass`);
+        fs.mkdirSync(tempPath);
+        fs.writeFileSync(
+            path.join(tempPath, "pass.json"),
+            JSON.stringify(passData, null, 2)
+        );
+
+        // copy images
+        fs.readdirSync(modelPath).forEach(file => {
+            if (file !== "pass.json") {
+                fs.copyFileSync(
+                    path.join(modelPath, file),
+                    path.join(tempPath, file)
+                );
+            }
+        });
+
+        const pass = await PKPass.from({
+            model: tempPath,
+            certificates: {
+                wwdr: fs.readFileSync("certs/wwdr.pem"),
+                signerCert: fs.readFileSync("certs/passCert.pem"),
+                signerKey: fs.readFileSync("certs/passKey.pem"),
+                signerKeyPassphrase: "password"
+            }
+        });
 
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
-            message: qr,
+            message: `https://love-coupon-server.onrender.com/redeem/${id}`,
             messageEncoding: "iso-8859-1"
         });
 
-        res.set({ "Content-Type": "application/vnd.apple.pkpass" });
+        res.set({
+            "Content-Type": "application/vnd.apple.pkpass"
+        });
+
         res.send(pass.getAsBuffer());
 
+        // cleanup temp
+        fs.rmSync(tempPath, { recursive: true, force: true });
+
     } catch (err) {
-        console.log("CREATE ERROR:", err);
+        console.log("ERROR:", err);
         res.status(500).send(err.toString());
     }
 });
 
 /*
-REDEEM (simple for now)
+REDEEM
 */
 app.get("/redeem/:id", (req, res) => {
     const coupon = coupons[req.params.id];
@@ -118,6 +137,6 @@ app.get("/redeem/:id", (req, res) => {
     res.send(`Redeemed: ${coupon.text}`);
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
     console.log("Running on port", PORT);
 });
