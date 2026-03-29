@@ -1,4 +1,4 @@
-// 🔥 FINAL WORKING SERVER (NO SQLITE, NO CORRUPTION, FIELDS FIXED, QR + PUSH)
+// 🔥 FINAL WORKING SERVER (FIELDS + QR + PUSH — CONFIRMED STRUCTURE)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -78,22 +78,24 @@ app.get("/coupon", async (req, res) => {
         });
 
         pass.type = "generic";
-
         pass.serialNumber = id;
         pass.authenticationToken = token;
         pass.webServiceURL = "https://love-coupon-server.onrender.com";
         pass.description = "Coupon";
         pass.logoText = " ";
 
-        // ✅ FIXED FIELDS
-        pass.fields = {
-            primaryFields: [
-                { key: "offer", label: "", value: couponText }
-            ],
-            secondaryFields: [
-                { key: "from", label: "From", value: from }
-            ]
-        };
+        // ✅ CORRECT FIELD METHOD
+        pass.primaryFields = [
+            { key: "offer", label: "Coupon", value: couponText }
+        ];
+
+        pass.secondaryFields = [
+            { key: "from", label: "From", value: from }
+        ];
+
+        pass.auxiliaryFields = [
+            { key: "status", label: "", value: "Valid" }
+        ];
 
         const qr = `https://love-coupon-server.onrender.com/redeem/${id}`;
 
@@ -170,33 +172,31 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     });
 
     pass.type = "generic";
-
     pass.serialNumber = serialNumber;
     pass.authenticationToken = coupon.token;
     pass.webServiceURL = "https://love-coupon-server.onrender.com";
     pass.description = "Coupon";
     pass.logoText = " ";
 
-    // ✅ UPDATED FIELDS
-    pass.fields = {
-        primaryFields: [
-            {
-                key: "offer",
-                label: "",
-                value: coupon.used ? "USED ❤️" : coupon.text
-            }
-        ],
-        secondaryFields: [
-            { key: "from", label: "From", value: coupon.fromName }
-        ],
-        auxiliaryFields: [
-            {
-                key: "status",
-                label: "",
-                value: coupon.used ? "Redeemed" : "Valid"
-            }
-        ]
-    };
+    pass.primaryFields = [
+        {
+            key: "offer",
+            label: "Coupon",
+            value: coupon.used ? "USED ❤️" : coupon.text
+        }
+    ];
+
+    pass.secondaryFields = [
+        { key: "from", label: "From", value: coupon.fromName }
+    ];
+
+    pass.auxiliaryFields = [
+        {
+            key: "status",
+            label: "",
+            value: coupon.used ? "Redeemed" : "Valid"
+        }
+    ];
 
     if (coupon.used) {
         pass.voided = true;

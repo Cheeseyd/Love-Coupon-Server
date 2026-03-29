@@ -10,7 +10,5 @@
   "backgroundColor": "rgb(255,105,180)",
   "webServiceURL": "https://love-coupon-server.onrender.com",
   "authenticationToken": "1234567890123456",
-  "generic": {
-    "primaryFields": []
-  }
+  "generic": {}
 }
