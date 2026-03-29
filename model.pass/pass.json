@@ -8,17 +8,9 @@
   "logoText": " ",
   "foregroundColor": "rgb(255,255,255)",
   "backgroundColor": "rgb(255,105,180)",
-
   "webServiceURL": "https://love-coupon-server.onrender.com",
-  "authenticationToken": "temp",
-
+  "authenticationToken": "1234567890123456",
   "generic": {
-    "primaryFields": [
-      {
-        "key": "offer",
-        "label": "",
-        "value": "Test"
-      }
-    ]
+    "primaryFields": []
   }
 }
