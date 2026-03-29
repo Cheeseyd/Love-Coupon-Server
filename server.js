@@ -1,4 +1,4 @@
-// 🔥 FINAL SERVER (WORKING — CORRECT TYPE + FIELDS + QR + PUSH)
+// 🔥 FINAL SERVER (WORKING — NO setType, CORRECT GENERIC FIELDS)
 
 const express = require("express");
 const { PKPass } = require("passkit-generator");
@@ -77,16 +77,13 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ✅ CORRECT TYPE
-        pass.setType("generic");
-
         pass.serialNumber = id;
         pass.authenticationToken = token;
         pass.webServiceURL = "https://love-coupon-server.onrender.com";
         pass.description = "Coupon";
         pass.logoText = " ";
 
-        // ✅ FIELDS
+        // ✅ CORRECT WAY FOR GENERIC PASSES
         pass.primaryFields = [
             { key: "offer", label: "Coupon", value: couponText }
         ];
@@ -172,8 +169,6 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
             signerKeyPassphrase: "password"
         }
     });
-
-    pass.setType("generic");
 
     pass.serialNumber = serialNumber;
     pass.authenticationToken = coupon.token;
