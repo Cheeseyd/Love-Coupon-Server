@@ -73,7 +73,7 @@ app.get("/coupon", async (req, res) => {
 
         base.generic = {
             primaryFields: [{ key: "offer", label: "Coupon", value: couponText }],
-            secondaryFields: [{ key: "from", label: "From", value: from }]
+            secondaryFields: [{ key: "from", label: "From", value: from || "Someone ❤️" }]
         };
 
         const tempPath = path.join(__dirname, `temp-${id}.pass`);
@@ -173,7 +173,7 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         secondaryFields: [{
             key: "from",
             label: "From",
-            value: coupon.from
+            value: coupon.from || "Someone ❤️"
         }]
     };
 
