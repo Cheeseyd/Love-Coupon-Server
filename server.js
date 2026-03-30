@@ -30,7 +30,7 @@ function saveCoupons() {
 }
 
 /*
-APN
+APN (PUSH)
 */
 const apnProvider = new apn.Provider({
     token: {
@@ -103,7 +103,6 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
-        // ✅ QR CODE
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
             message: `https://love-coupon-server.onrender.com/redeem/${id}`,
@@ -122,7 +121,7 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-REGISTER DEVICE
+REGISTER DEVICE (for push)
 */
 app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", (req, res) => {
     const { serialNumber } = req.params;
@@ -187,7 +186,10 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         ]
     };
 
-    if (coupon.used) base.voided = true;
+    if (coupon.used) {
+        base.voided = true;
+        base.expirationDate = new Date(Date.now() - 1000).toISOString();
+    }
 
     const tempPath = path.join(__dirname, `temp-${serialNumber}.pass`);
     fs.mkdirSync(tempPath);
@@ -213,7 +215,7 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    // ✅ CRITICAL FIX: QR AGAIN
+    // ✅ KEEP QR ON UPDATE
     pass.setBarcodes({
         format: "PKBarcodeFormatQR",
         message: `https://love-coupon-server.onrender.com/redeem/${serialNumber}`,
@@ -254,6 +256,36 @@ app.get("/redeem/:id", async (req, res) => {
     res.send(`Redeemed: ${coupon.text}`);
 });
 
+/*
+DELETE (FROM APP)
+*/
+app.get("/delete/:id", async (req, res) => {
+    const coupon = coupons[req.params.id];
+
+    if (!coupon) return res.send("Not found");
+
+    coupon.used = true;
+    saveCoupons();
+
+    if (coupon.pushToken) {
+        const note = new apn.Notification();
+        note.topic = "pass.com.dillybarproductions.coupons";
+        note.contentAvailable = 1;
+
+        try {
+            await apnProvider.send(note, coupon.pushToken);
+            console.log("🚀 Push sent (delete)");
+        } catch (err) {
+            console.log("Push error:", err);
+        }
+    }
+
+    res.send("Deleted");
+});
+
+/*
+LIST COUPONS (FOR APP)
+*/
 app.get("/coupons", (req, res) => {
     const list = Object.entries(coupons).map(([id, c]) => ({
         id,
@@ -265,6 +297,9 @@ app.get("/coupons", (req, res) => {
     res.json(list);
 });
 
+/*
+START
+*/
 app.listen(PORT, () => {
     console.log("Running on port", PORT);
 });
