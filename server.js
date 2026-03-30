@@ -30,7 +30,7 @@ function saveCoupons() {
 }
 
 /*
-APN (PUSH)
+APN
 */
 const apnProvider = new apn.Provider({
     token: {
@@ -82,10 +82,7 @@ app.get("/coupon", async (req, res) => {
         const tempPath = path.join(__dirname, `temp-${id}.pass`);
         fs.mkdirSync(tempPath);
 
-        fs.writeFileSync(
-            path.join(tempPath, "pass.json"),
-            JSON.stringify(base, null, 2)
-        );
+        fs.writeFileSync(path.join(tempPath, "pass.json"), JSON.stringify(base, null, 2));
 
         fs.readdirSync(modelPath).forEach(f => {
             if (f !== "pass.json") {
@@ -103,9 +100,10 @@ app.get("/coupon", async (req, res) => {
             }
         });
 
+        // 🔥 QR = CUSTOM (NOT URL)
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
-            message: `https://love-coupon-server.onrender.com/redeem/${id}`,
+            message: `coupon:${id}`,
             messageEncoding: "iso-8859-1"
         });
 
@@ -121,13 +119,11 @@ app.get("/coupon", async (req, res) => {
 });
 
 /*
-REGISTER DEVICE (for push)
+REGISTER DEVICE
 */
 app.post("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", (req, res) => {
     const { serialNumber } = req.params;
     const pushToken = req.body.pushToken;
-
-    console.log("🔥 REGISTERED DEVICE");
 
     if (coupons[serialNumber]) {
         coupons[serialNumber].pushToken = pushToken;
@@ -144,8 +140,6 @@ app.get("/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier"
     const updated = Object.entries(coupons)
         .filter(([_, c]) => c.used)
         .map(([id]) => id);
-
-    console.log("📡 Wallet checking →", updated);
 
     res.json({
         serialNumbers: updated,
@@ -194,10 +188,7 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
     const tempPath = path.join(__dirname, `temp-${serialNumber}.pass`);
     fs.mkdirSync(tempPath);
 
-    fs.writeFileSync(
-        path.join(tempPath, "pass.json"),
-        JSON.stringify(base, null, 2)
-    );
+    fs.writeFileSync(path.join(tempPath, "pass.json"), JSON.stringify(base, null, 2));
 
     fs.readdirSync(modelPath).forEach(f => {
         if (f !== "pass.json") {
@@ -215,10 +206,10 @@ app.get("/v1/passes/:passTypeIdentifier/:serialNumber", async (req, res) => {
         }
     });
 
-    // ✅ KEEP QR ON UPDATE
+    // 🔥 QR AGAIN (IMPORTANT)
     pass.setBarcodes({
         format: "PKBarcodeFormatQR",
-        message: `https://love-coupon-server.onrender.com/redeem/${serialNumber}`,
+        message: `coupon:${serialNumber}`,
         messageEncoding: "iso-8859-1"
     });
 
@@ -244,62 +235,12 @@ app.get("/redeem/:id", async (req, res) => {
         const note = new apn.Notification();
         note.topic = "pass.com.dillybarproductions.coupons";
         note.contentAvailable = 1;
-
-        try {
-            await apnProvider.send(note, coupon.pushToken);
-            console.log("🚀 Push sent");
-        } catch (err) {
-            console.log("Push error:", err);
-        }
+        await apnProvider.send(note, coupon.pushToken);
     }
 
     res.send(`Redeemed: ${coupon.text}`);
 });
 
-/*
-DELETE (FROM APP)
-*/
-app.get("/delete/:id", async (req, res) => {
-    const coupon = coupons[req.params.id];
-
-    if (!coupon) return res.send("Not found");
-
-    coupon.used = true;
-    saveCoupons();
-
-    if (coupon.pushToken) {
-        const note = new apn.Notification();
-        note.topic = "pass.com.dillybarproductions.coupons";
-        note.contentAvailable = 1;
-
-        try {
-            await apnProvider.send(note, coupon.pushToken);
-            console.log("🚀 Push sent (delete)");
-        } catch (err) {
-            console.log("Push error:", err);
-        }
-    }
-
-    res.send("Deleted");
-});
-
-/*
-LIST COUPONS (FOR APP)
-*/
-app.get("/coupons", (req, res) => {
-    const list = Object.entries(coupons).map(([id, c]) => ({
-        id,
-        text: c.text,
-        from: c.from,
-        used: c.used
-    }));
-
-    res.json(list);
-});
-
-/*
-START
-*/
 app.listen(PORT, () => {
     console.log("Running on port", PORT);
 });
